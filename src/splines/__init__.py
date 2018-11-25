@@ -1,5 +1,7 @@
 """Piecewise polynomial curves (in Euclidean space).
 
+.. include:: math-definitions.rst
+
 .. rubric:: Submodules
 
 .. autosummary::
@@ -73,6 +75,95 @@ class Monomial:
         product = _np.multiply.reduce
         weights = product([powers + 1 + i for i in range(n)]) / (t1 - t0)**n
         return t**powers * weights @ coefficients
+
+    def tangent(self, t):
+        r"""Calculate the (normalized) tangent at given time(s).
+
+        This only works for 2D and 3D curves.
+
+        .. math::
+
+            \vec{T} = \frac{\vec{\dot{x}}}{\norm{\vec{\dot{x}}}}
+
+        """
+        a = self.evaluate(t, 1)
+        if _np.isscalar(t):
+            return _normalize(a)
+        return _np.apply_along_axis(_normalize, 1, a)
+
+    def binormal(self, t):
+        r"""Calculate the binormal at given time(s).
+
+        This only works for 3D curves.
+
+        .. math::
+
+            \vec{B} = \frac
+            {\vec{\dot{x}} \times \vec{\ddot{x}}}
+            {\norm{\vec{\dot{x}} \times \vec{\ddot{x}}}}
+
+        """
+        a = _np.cross(self.evaluate(t, 1), self.evaluate(t, 2))
+        if _np.isscalar(t):
+            return _normalize(a)
+        return _np.apply_along_axis(_normalize, 1, a)
+
+    def normal(self, t):
+        r"""Calculate the principal normal at given time(s).
+
+        This only works for 2D and 3D curves.
+
+        2D case: TODO
+
+        3D case:
+
+        .. math::
+
+            \vec{N} = \vec{B} \times \vec{T}
+
+        """
+        ndim = self.segments[0].shape[1]
+        if ndim == 2:
+            raise NotImplementedError('TODO: implement 2D case!')
+        return _np.cross(self.binormal(t), self.tangent(t))
+
+    def curvature(self, t):
+        r"""Calculate the curvature at given time(s).
+
+        This only works for 2D and 3D curves.
+
+        3D case:
+
+        .. math::
+
+            \kappa = \frac
+            {\norm{\vec{\dot{x}} \times \vec{\ddot{x}}}}
+            {\norm{\vec{\dot{x}}} ^ 3}
+
+        """
+        return NotImplemented
+
+    def torsion(self, t):
+        r"""Calculate the torsion at given time(s).
+
+        This only works for 3D curves.
+
+        .. math::
+
+            \tau = \frac
+            {(\vec{\dot{x}} \times \vec{\ddot{x}}) \cdot \vec{\dddot{x}}}
+            {\norm{\vec{\dot{x}} \times \vec{\ddot{x}}} ^ 2}
+
+        """
+        return NotImplemented
+
+
+def _normalize(v):
+    """Normalize a vector."""
+    assert _np.ndim(v) == 1
+    # Disable warning for zero-length vectors which lead to NaN values:
+    with _np.errstate(invalid='ignore'):
+        return v / _np.linalg.norm(v)
 
 
 class Bernstein:
