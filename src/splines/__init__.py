@@ -126,6 +126,88 @@ class Bernstein:
             a * b
             for a, b in zip(control_points, self.basis(degree, t)))
 
+def lerp(xs, ts, t):
+    """Linear interpolation.
+    
+    Returns the interpolated value at time *t*,
+    given the two values *xs* at times *ts*.
+    
+    """
+    x_begin, x_end = _np.asarray(xs)
+    t_begin, t_end = ts
+    t = _np.asarray(t)
+    return (x_begin * (t_end - t) + x_end * (t - t_begin)) / (t_end - t_begin)
+
+
+class BarryGoldman:
+    
+    def __init__(self, vertices, grid=None, *, alpha=None, m=1, n=2):
+        """
+
+        Only closed splines are supported.
+        
+        m: Lagrange degree
+        n: B-spline degree
+        
+        """
+        vertices = _check_vertices(vertices, closed=True)
+        #vertices = _np.asarray(vertices)
+        self.grid = _check_grid(grid, alpha, vertices)
+        self.vertices = vertices[:-1]  # Remove the added vertex again
+        assert len(self.vertices) + 1 == len(self.grid)
+        self.m = m
+        self.n = n
+        
+    def evaluate(self, t):
+        if not _np.isscalar(t):
+            return _np.array([self.evaluate(time) for time in t])
+
+        idx = _check_param('t', t, self.grid)
+
+        #t0, t1 = self.grid[idx:idx + 2]
+        t0 = self.grid[idx]
+
+        deltas = _np.diff(self.grid)
+        assert len(deltas) == len(self.vertices)
+
+        total_degree = self.m + self.n
+        total_vertices = total_degree + 1
+        add_both, add_left = divmod(total_vertices - 2, 2)
+
+        # Additional times (on the right) for de Boor algorithm
+        add_times = max(0, self.n - 1 - self.m)
+
+        fancy_idx = _np.arange(
+            idx - add_both - add_left,
+            idx + add_both + add_times + 2) % len(self.vertices)
+        xs = self.vertices[fancy_idx[:total_vertices]]
+        deltas = deltas[fancy_idx][:-1]
+
+        ts_after = t0 + _np.cumsum(deltas[add_both + add_left:])
+        ts_before = t0 - _np.cumsum(deltas[:add_both + add_left][::-1])[::-1]
+        ts = [*ts_before, t0, *ts_after]
+
+        # overlapping Neville algorithm
+
+        assert self.m == 0 or len(xs) == len(ts)
+        for step in range(1, self.m + 1):
+            xs = [
+                lerp(*args, t)
+                for args in zip(zip(xs, xs[1:]), zip(ts, ts[step:]))]
+
+        ts = ts[self.m:]
+
+        # De Boor algoritmn
+
+        assert self.n == 0 or 2 * len(xs) - 2 == len(ts)
+        while len(xs) > 1:
+            xs = [
+                lerp(*args, t)
+                for args in zip(zip(xs, xs[1:]), zip(ts, ts[len(xs) - 1:]))]
+            ts = ts[1:-1]
+
+        return xs[0]
+        
 
 def _check_param(name, param, grid):
     if param < grid[0]:
