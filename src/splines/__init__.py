@@ -67,7 +67,6 @@ class Monomial:
         idx = _check_param('t', t, self.grid)
 
         t0, t1 = self.grid[idx:idx + 2]
-        t = (t - t0) / (t1 - t0)
         coefficients = self.segments[idx][:-n or None]
         powers = _np.arange(len(coefficients))[::-1]
         product = _np.multiply.reduce
@@ -254,12 +253,6 @@ def _natural_tangent(vertices, times, tangent):
 class CubicHermite(Monomial):
     """Cubic Hermite curve, see __init__()."""
 
-    matrix = _np.array([
-        [2, -2, 1, 1],
-        [-3, 3, -2, -1],
-        [0, 0, 1, 0],
-        [1, 0, 0, 0]])
-
     def __init__(self, vertices, tangents, grid=None):
         """Cubic Hermite curve.
 
@@ -283,12 +276,19 @@ class CubicHermite(Monomial):
         if len(vertices) != len(grid):
             raise ValueError('As many grid times as vertices are needed')
         tangents = _np.asarray(tangents)
-        segments = [
-            self.matrix @ [x0, x1, (t1 - t0) * v0, (t1 - t0) * v1]
-            for (x0, x1), (v0, v1), (t0, t1) in zip(
+        segments = []
+        for (x0, x1), (v0, v1), (t0, t1) in zip(
                 zip(vertices, vertices[1:]),
                 zip(tangents[::2], tangents[1::2]),
-                zip(grid, grid[1:]))]
+                zip(grid, grid[1:])):
+            matrix = _np.array([
+                [                 2,                 -2,              1,              1],
+                [      -3*t0 - 3*t1,        3*t0 + 3*t1,     -t0 - 2*t1,     -2*t0 - t1],
+                [           6*t0*t1,           -6*t0*t1, t1*(2*t0 + t1), t0*(t0 + 2*t1)],
+                [t1**2*(-3*t0 + t1), t0**2*(-t0 + 3*t1),      -t0*t1**2,      -t0**2*t1]])
+            segment = matrix @ [x0, x1, (t1 - t0) * v0, (t1 - t0) * v1]
+            segment /= (t1 - t0)**3
+            segments.append(segment)
         Monomial.__init__(self, segments, grid)
 
 
