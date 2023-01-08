@@ -1,6 +1,7 @@
 name: Run tests
 on: [push, pull_request]
 env:
+  PYTHONWARNINGS: error
   PYTEST_ADDOPTS: "--color=yes"
   PIP_INSTALL: python -m pip install
 jobs:
